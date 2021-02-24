@@ -16,6 +16,7 @@ import androidx.appcompat.app.AppCompatActivity;
 
 import com.example.e_library.Rent.UseHistory;
 import com.example.e_library.book.BookInfoAct;
+import com.example.e_library.favor.FavorListAct;
 import com.example.e_library.member.JoinAct;
 import com.example.e_library.member.LoginAct;
 import com.example.e_library.MainActivity;
@@ -98,6 +99,9 @@ public class BasicActivity extends AppCompatActivity {
                 break;
             case R.id.member:
                 basicIntent = new Intent(this, MemberAct.class);
+                break;
+            case R.id.favorBook:
+                basicIntent = new Intent(this, FavorListAct.class);
                 break;
         }
         startActivity(basicIntent);

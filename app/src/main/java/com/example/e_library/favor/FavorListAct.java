@@ -1,25 +1,23 @@
-package com.example.e_library.book;
+package com.example.e_library.favor;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import android.content.Context;
-import android.content.Intent;
+import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.os.Handler;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
-import android.widget.Button;
-import android.widget.EditText;
 import android.widget.ListView;
-import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import com.example.e_library.R;
+import com.example.e_library.book.BookVO;
+import com.example.e_library.book.SearchBookAct;
 import com.example.e_library.common.BasicActivity;
 
 import org.json.JSONArray;
@@ -34,85 +32,48 @@ import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
 
-//도서 검색
-public class SearchBookAct extends BasicActivity {
 
-    final String[] items = {"도서명","저자","출판사"};//스피너
-    List<BookVO> bookList = new ArrayList<>();//검색 결과 리스트
-    BookAdapter bookAdapter;
-    Spinner spinner;
-    EditText etSearchBook;
-    Button btnSearch;
-    String column;
-    ListView lvBook;
-    boolean resume = false;
+//관심도서 목록
+public class FavorListAct extends BasicActivity {
+
+    ListView lvFavorList;
+    TextView bookName, writer, publisher, publiDate, status, bookId;
+    List<BookVO> favorList = new ArrayList<>();//검색 결과 리스트
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.search_book);
-        spinner = findViewById(R.id.field_spinner);
-        etSearchBook = findViewById(R.id.etSearchBook);
-        btnSearch = findViewById(R.id.btnSearch);
-        lvBook = findViewById(R.id.lvBook);
+        setContentView(R.layout.favor_list);
+        lvFavorList = findViewById(R.id.lvFavorList);
 
-        //스피너 세팅
-        ArrayAdapter<String> spinnerAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item, items);
-        spinner.setAdapter(spinnerAdapter);
-
-        //검색버튼
-        btnSearch.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-
-                //스피너 선택값으로 DB 검색용 필드 변환
-                String spinnerStr = spinner.getSelectedItem().toString();
-                switch (spinnerStr) {
-                    case "도서명":    column = "bookName";     break;
-                    case "저자":      column = "writer";       break;
-                    case "출판사":    column = "publisher";    break;
-                    default:         column = "";             break;
-                }
-
-                //도서검색 백그라운드작업
-                new SearchBookThread().start();
-
-            }//onClick
-        });//btnSearch
-    }//onCreate
-
-
-    @Override
-    protected void onResume() {
-        super.onResume();
-
-        if (resume == true) //처음 한번은 실행 안되고 그 이후에만 실행
-            new SearchBookThread().start();
-
-        resume = true;
+        new FavorListThread().start();//관심도서 백그라운드작업
     }
 
-    //도서검색 백그라운드작업
-    class SearchBookThread extends Thread {
+
+
+
+    //관심도서 백그라운드작업
+    class FavorListThread extends Thread {
         StringBuilder sb = new StringBuilder();
         Handler handler = new Handler();
+        SharedPreferences sp = getSharedPreferences("sFile",MODE_PRIVATE);
+        String memberId = sp.getString("memberId","empty");
 
         @Override
         public void run() {
             try {
-
                 //서버 접속 및 데이터 전송
-                String server = "http://192.168.200.173:8080/androidSearchBook";
+                String server = "http://192.168.200.173:8080/androidFavorList";
                 URL url = new URL(server);
                 HttpURLConnection conn = (HttpURLConnection) url.openConnection();
                 conn.setConnectTimeout(5000);
                 conn.setRequestMethod("POST");
                 conn.setUseCaches(false);
-                String param = "column="+column+
-                              "&searchBook="+etSearchBook.getText().toString();//서버로 갈 정보
+                String param = "memberId="+memberId;//서버로 갈 정보
                 byte[] bytes = param.getBytes("UTF-8");//정보를 바이트배열에 담고
                 OutputStream os = conn.getOutputStream();//접속객체에서 출력스트림 만들어서
                 os.write(bytes);//출력스트림에 바이트배열을 담자 (전송 완료)
+
 
 
                 //서버로부터 정상 응답 받으면
@@ -131,12 +92,10 @@ public class SearchBookAct extends BasicActivity {
                     br.close();
                     conn.disconnect();
 
-                    bookList.clear();//검색버튼 누를 때마다 리스트를 초기화(검색 결과 화면 누적 방지)
-
                     //꺼내온 데이터를 json 변환
                     JSONObject jsonObj = new JSONObject(sb.toString());//제이슨객체 생성
-                    JSONArray jArray = jsonObj.getJSONArray("result");//제이슨객체에서 제이슨배열 꺼내기
-                    for (int i = 0; i < jArray.length(); i++) {//제이슨배열에서 리스트로 데이터 이동
+                    JSONArray jArray = jsonObj.getJSONArray("result");
+                    for (int i = 0; i < jArray.length(); i++) {
                         JSONObject jsonRow = jArray.getJSONObject(i);
                         BookVO book = new BookVO();
                         book.setBookId(jsonRow.getString("bookId"));
@@ -145,32 +104,15 @@ public class SearchBookAct extends BasicActivity {
                         book.setPublisher(jsonRow.getString("publisher"));
                         book.setPubliDate(jsonRow.getString("publiDate"));
                         book.setStatus(jsonRow.getString("status"));
-                        bookList.add(book);
+                        favorList.add(book);
                     }
 
                     //결과 화면
                     handler.post(new Runnable() {
                         @Override
                         public void run() {
-                            //검색 결과가 있으면 어댑터로 리스트 나열
-                            if (bookList.size() > 0) {
-                                BookAdapter bookAdapter = new BookAdapter(SearchBookAct.this, R.layout.book_info_row, bookList);
-                                lvBook.setAdapter(bookAdapter);
-                                
-                                //아이템 클릭 시 도서정보로 이동
-                                lvBook.setOnItemClickListener(new AdapterView.OnItemClickListener() {
-                                    @Override
-                                    public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
-                                        Intent intent = new Intent(getApplicationContext(), BookInfoAct.class);
-                                        intent.putExtra("book", bookList.get(position));
-                                        startActivity(intent);
-                                    }
-                                });
-                            }
-                            else {
-                                Toast.makeText(SearchBookAct.this, "검색 결과가 없습니다.", Toast.LENGTH_SHORT).show();
-                                lvBook.setAdapter(bookAdapter);
-                            }
+                            FavorListAdapter adapter = new FavorListAdapter(FavorListAct.this, R.layout.favor_book_row, favorList);
+                            lvFavorList.setAdapter(adapter);
                         }
                     });
                 }//if (conn.getResponseCode() == 200)
@@ -179,20 +121,24 @@ public class SearchBookAct extends BasicActivity {
                 handler.post(new Runnable() {
                     @Override
                     public void run() {
-                        Toast.makeText(SearchBookAct.this, "ERROR : "+e.toString(), Toast.LENGTH_SHORT).show();
+                        Toast.makeText(FavorListAct.this, "ERROR : "+e.toString(), Toast.LENGTH_SHORT).show();
                     }
                 });
             }
         }//run
-    }//JoinThread
+    }//FavorListThread
+
+
+
+
 
 
 
 
     //커스텀 어댑터
-    class BookAdapter extends ArrayAdapter<BookVO> {
+    class FavorListAdapter extends ArrayAdapter<BookVO> {
 
-        public BookAdapter(@NonNull Context context, int resource, @NonNull List<BookVO> objects) {
+        public FavorListAdapter(@NonNull Context context, int resource, @NonNull List<BookVO> objects) {
             super(context, resource, objects);
         }
 
@@ -205,11 +151,11 @@ public class SearchBookAct extends BasicActivity {
 
             if (v == null) {//처음 한번만 실행
                 LayoutInflater li = (LayoutInflater) getSystemService(Context.LAYOUT_INFLATER_SERVICE);//뷰생성기
-                v = li.inflate(R.layout.book_info_row, null);//자식뷰 생성
+                v = li.inflate(R.layout.favor_book_row, null);//자식뷰 생성
             }
 
             //자식뷰에 데이터 투입
-            BookVO bookVO = bookList.get(position);
+            BookVO bookVO = favorList.get(position);
             if (bookVO != null) {
                 TextView bookName = v.findViewById(R.id.bookName);
                 TextView writer = v.findViewById(R.id.writer);
@@ -225,6 +171,7 @@ public class SearchBookAct extends BasicActivity {
                 status.setText(bookVO.getStatus());
                 bookId.setText(bookVO.getBookId());
             }
+
             return  v;
         }
     }

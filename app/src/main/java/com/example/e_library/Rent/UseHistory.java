@@ -2,13 +2,11 @@ package com.example.e_library.Rent;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.appcompat.app.AppCompatActivity;
 
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.os.Handler;
-import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -19,8 +17,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import com.example.e_library.R;
-import com.example.e_library.book.BookInfoAct;
-import com.example.e_library.book.BookVO;
+import com.example.e_library.common.BasicActivity;
 import com.example.e_library.common.DTO;
 
 import org.json.JSONArray;
@@ -35,10 +32,11 @@ import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
 
-public class UseHistory extends AppCompatActivity {
+//대출 이용 내역(리스트 나열 -> 클릭 -> 반납처리)
+public class UseHistory extends BasicActivity {
 
     ListView lvUseHistory;
-    List<DTO> dtoList = new ArrayList<>();
+    List<DTO> dtoList;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -46,10 +44,8 @@ public class UseHistory extends AppCompatActivity {
         setContentView(R.layout.use_history);
         lvUseHistory = findViewById(R.id.lvUseHistory);
 
-        new UseHistoryThread().start();
+        new UseHistoryThread().start();//도서대출 이용내역 백그라운드작업
     }
-
-
 
 
 
@@ -96,6 +92,7 @@ public class UseHistory extends AppCompatActivity {
                     //꺼내온 데이터를 json 변환
                     JSONObject jsonObj = new JSONObject(sb.toString());//제이슨객체 생성
                     JSONArray jArray = jsonObj.getJSONArray("result");
+                    dtoList = new ArrayList<>();
 
                     //json 에서 dto 로 이동
                     for (int i = 0; i < jArray.length(); i++) {
@@ -116,8 +113,7 @@ public class UseHistory extends AppCompatActivity {
                     handler.post(new Runnable() {
                         @Override
                         public void run() {
-                           // Toast.makeText(UseHistory.this, ""+dtoList, Toast.LENGTH_SHORT).show();
-                            UseHistoryAdapter adapter = new UseHistoryAdapter(UseHistory.this, R.layout.use_history_row, dtoList);
+                            UseHistoryAdapter adapter = new UseHistoryAdapter(UseHistory.this, R.layout.use_book_row, dtoList);
                             lvUseHistory.setAdapter(adapter);
                         }
                     });
@@ -154,7 +150,7 @@ public class UseHistory extends AppCompatActivity {
 
             if (v == null) {//처음 한번만 실행
                 LayoutInflater li = (LayoutInflater) getSystemService(Context.LAYOUT_INFLATER_SERVICE);//뷰생성기
-                v = li.inflate(R.layout.use_history_row, null);//자식뷰 생성
+                v = li.inflate(R.layout.use_book_row, null);//자식뷰 생성
             }
 
             //자식뷰에 데이터 투입
@@ -169,18 +165,19 @@ public class UseHistory extends AppCompatActivity {
                 tvBookName.setText(dto.getBookName());
                 tvRentDate.setText("대출일 : "+dto.getRentDate());
                 tvBackDate.setText("반납일 : "+dto.getReturnDate());
-                if (dto.getLateDate() > 0)
+
+                if (dto.getLateDate() > 0)//연체 체크
                     tvLateDate.setText("연체기간 : "+dto.getLateDate());
                 else
                     tvLateDate.setText("연체없음");
 
-                //도서반납이 안된 자식뷰만 반납버튼 생성
-                if (dto.getReturnDate().equals("")) {
+                //도서반납이 안된 자식뷰만 반납버튼 생성, 반납 처리
+                if (dto.getReturnDate().equals("미반납")) {
                     btnBackBook.setVisibility(View.VISIBLE);
                     btnBackBook.setOnClickListener(new View.OnClickListener() {
                         @Override
                         public void onClick(View v) {
-                            Toast.makeText(UseHistory.this, ""+dto.getReturnDate(), Toast.LENGTH_SHORT).show();
+                            new backRentThread(dto).start(); //도서반납 백그라운드작업
                         }
                     });
                 }
@@ -194,34 +191,35 @@ public class UseHistory extends AppCompatActivity {
 
 
 
-//////////////////////////////////////////////////////////////////반납작업할 것
 
 
     //도서반납 백그라운드작업
     class backRentThread extends Thread {
         StringBuilder sb = new StringBuilder();
         Handler handler = new Handler();
+        DTO dto;
+
+        public backRentThread(DTO dto) {
+            this.dto = dto;//해당도서 확인용 생성자
+        }
 
         @Override
         public void run() {
             try {
                 //서버 접속 및 데이터 전송
-                String server = "http://192.168.200.173:8080/androidUseHistory";
+                String server = "http://192.168.200.173:8080/androidBackRent";
                 URL url = new URL(server);
                 HttpURLConnection conn = (HttpURLConnection) url.openConnection();
                 conn.setConnectTimeout(5000);
                 conn.setRequestMethod("POST");
                 conn.setUseCaches(false);
-                String param = "rentId=";//서버로 갈 정보
+                String param = "rentId="+dto.getRentId()+"&bookId="+dto.getBookId();//서버로 갈 정보
                 byte[] bytes = param.getBytes("UTF-8");//정보를 바이트배열에 담고
                 OutputStream os = conn.getOutputStream();//접속객체에서 출력스트림 만들어서
                 os.write(bytes);//출력스트림에 바이트배열을 담자 (전송 완료)
 
-
-
                 //서버로부터 정상 응답 받으면
                 if (conn.getResponseCode() == 200) {
-
                     InputStream is = conn.getInputStream();//서버에서 자료 받을 입력스트림
                     InputStreamReader isr = new InputStreamReader(is, "utf-8");//한글처리
                     BufferedReader br = new BufferedReader(isr);//성능
@@ -237,30 +235,14 @@ public class UseHistory extends AppCompatActivity {
 
                     //꺼내온 데이터를 json 변환
                     JSONObject jsonObj = new JSONObject(sb.toString());//제이슨객체 생성
-                    JSONArray jArray = jsonObj.getJSONArray("result");
-
-                    //json 에서 dto 로 이동
-                    for (int i = 0; i < jArray.length(); i++) {
-                        JSONObject jsonRow = jArray.getJSONObject(i);
-                        DTO dto = new DTO();
-                        dto.setRentId(jsonRow.getString("rentId"));
-                        dto.setBookId(jsonRow.getString("bookId"));
-                        dto.setBookName(jsonRow.getString("bookName"));
-                        dto.setRentDate(jsonRow.getString("rentDate"));
-                        dto.setDueDate(jsonRow.getString("dueDate"));
-                        dto.setReturnDate(jsonRow.getString("returnDate"));
-                        dto.setLateDate(jsonRow.getInt("lateDate"));
-                        dtoList.add(dto);
-                    }
-
+                    String result = jsonObj.getString("result");
 
                     //결과 화면
                     handler.post(new Runnable() {
                         @Override
                         public void run() {
-                            // Toast.makeText(UseHistory.this, ""+dtoList, Toast.LENGTH_SHORT).show();
-                            UseHistoryAdapter adapter = new UseHistoryAdapter(UseHistory.this, R.layout.use_history_row, dtoList);
-                            lvUseHistory.setAdapter(adapter);
+                            new UseHistoryThread().start();//리스트뷰 갱신
+                            Toast.makeText(UseHistory.this, result, Toast.LENGTH_SHORT).show();
                         }
                     });
                 }//if (conn.getResponseCode() == 200)

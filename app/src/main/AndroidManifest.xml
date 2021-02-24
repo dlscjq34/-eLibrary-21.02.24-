@@ -13,7 +13,8 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.ELibrary">
-        <activity android:name=".Rent.UseHistory"></activity>
+        <activity android:name=".favor.FavorListAct"></activity>
+        <activity android:name=".Rent.UseHistory" />
         <activity android:name=".member.MemberAct" />
         <activity android:name=".member.JoinAct" />
         <activity android:name=".member.LoginAct" />

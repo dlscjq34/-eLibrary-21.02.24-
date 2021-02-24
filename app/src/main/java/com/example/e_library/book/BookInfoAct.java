@@ -1,20 +1,16 @@
 package com.example.e_library.book;
 
-import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.os.Handler;
 import android.view.View;
-import android.widget.AdapterView;
 import android.widget.Button;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import com.example.e_library.R;
 import com.example.e_library.common.BasicActivity;
-import com.example.e_library.member.MemberVO;
 
-import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.io.BufferedReader;
@@ -47,11 +43,11 @@ public class BookInfoAct extends BasicActivity {
         //도서 정보 표시
         BookVO book = (BookVO) getIntent().getSerializableExtra("book");
         bookName.setText(book.getBookName());
-        writer.setText(book.getWriter());
-        publisher.setText(book.getPublisher());
-        publiDate.setText(book.getPubliDate());
-        status.setText(book.getStatus());
-        bookId.setText(book.getBookId());
+        writer.setText("저자 : "+book.getWriter());
+        publisher.setText("출판사 : "+book.getPublisher());
+        publiDate.setText("출간일 : "+book.getPubliDate());
+        status.setText("상태 : "+book.getStatus());
+        bookId.setText("도서번호 : "+book.getBookId());
 
 
 
@@ -141,6 +137,7 @@ public class BookInfoAct extends BasicActivity {
                         @Override
                         public void run() {
                             Toast.makeText(BookInfoAct.this, ""+result, Toast.LENGTH_SHORT).show();
+                            status.setText("관 외 대출 중");
                         }
                     });
                 }//if (conn.getResponseCode() == 200)
